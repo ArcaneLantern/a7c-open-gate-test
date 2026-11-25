@@ -1,0 +1,16 @@
+{
+ "kit": "c7kit1_v1",
+ "camera": "ILCE-7C, firmware 2.03",
+ "written": "2026-11-26, before any contact with an A7C",
+ "basis": "a7c_map FINDINGS.md C7-F002..C7-F007 (static analysis of the 2.03 update, compared with the A7 III 4.04 and A7 IV 6.02)",
+ "predictions": [
+  {"id": "P1", "claim": "The camera in Mass Storage mode answers PMCA-RE's start request and comes back as a service device with USB id 054C:0336 (the A7 IV's), or 054C:02A9.", "source": "C7-F004 (same Senser gadget modules as the A7 III and A7 IV); the id itself is not a constant in usbg_sen.ko, as on the A7 III"},
+  {"id": "P2", "claim": "Authentication with PMCA-RE's public keys passes on the service device: three rounds answered 4, closing answer 6.", "source": "C7-F004: libsencore holds the A7 IV's three 512-byte key blocks byte for byte (at 0x561c9, 0x563c9, 0x55f77)"},
+  {"id": "P3", "claim": "READ_HASP answers.", "source": "A7 IV CT1"},
+  {"id": "P4", "claim": "/usr/share/pmbp/DeviceInfo.xml is 517 bytes, SHA-256 e44713178fad970870ead845c93abdfcf150c418de11b306da91f2d09d67c1b7 (the same file as the A7 III's and the A7 IV's).", "source": "2.03 update"},
+  {"id": "P5", "claim": "/usr/lib/libJiritsu.so, /usr/lib/libsencore.so and /usr/codec/vcd_firmware.bin equal the 2.03 update's files (sizes and SHA-256 in expected_203.json).", "source": "2.03 update; mount.conf (/usr = nflasha15), identical to the A7 III's"},
+  {"id": "P6", "claim": "/system/av-cam.bin (17,398,676 bytes) either equals the 2.03 update's file or answers status 0x10000015 (too large for the camera's service buffer). Medium: the buffer comes from a DMM pool whose size for this body is not known.", "source": "C7-F006: adj_cmd_get_file2 allocates file size + 4 with DmmMgr::dmm_alloc and answers 0x10000015 when that fails"},
+  {"id": "P7", "claim": "/setting/DmmConfig.bin exists and equals update/0800_appli/setting/DmmConfig.bin. Low confidence: the installed copy may differ or be missing.", "source": "2.03 update; mount.conf (/setting = nflasha2)"},
+  {"id": "P8", "claim": "/proc/cpuinfo and /proc/iomem come back with status 0 and no content (the file read sizes a file with stat, and /proc files report size 0).", "source": "C7-F006: adj_cmd_get_file2 calls 0x91b0 = __xstat(3, path, buf), the same as the A7 III"}
+ ]
+}
