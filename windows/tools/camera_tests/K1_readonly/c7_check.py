@@ -10,7 +10,7 @@ What it does, in one service session (camera in USB Mass Storage mode):
   1. switches the camera into service mode and logs in with PMCA-RE's public keys (as for the A7 IV / A7 III kits);
   2. READ_HASP (product information);
   3. reads these files, one after another, and compares each with the 2.03 update (size + SHA-256):
-       /usr/share/pmbp/DeviceInfo.xml   known answer: if it differs, nothing more is read
+       /usr/share/pmbp/DeviceInfo.xml   known answer: if it differs or cannot be read, nothing more is read
        /usr/lib/libJiritsu.so           the library that implements the service file commands
        /usr/lib/libsencore.so           the service-mode library
        /usr/codec/vcd_firmware.bin      the video codec firmware (byte-identical to the A7 III 4.04's)
@@ -68,6 +68,7 @@ FILES = (
 # GET_FILE2 inner status words (A7C libJiritsu.so adj_cmd_get_file2 0x5fe8; the A7 IV's are the same, CT7):
 STATUS_NAMES = {
     0: "read",
+    0x10000004: "service partition did not mount",
     0x10000006: "missing (stat failed)",
     0x10000015: "too large for the camera's service buffer",
     0x10000008: "could not be opened",
@@ -143,6 +144,9 @@ def body(session, camera, expected):
                 "not compared": "  NOT COMPARED: %s" % row["status_name"]}[row["outcome"]]
         session.say("  status %s, %d bytes, SHA-256 %s%s" % (
             "0x%08x" % status if isinstance(status, int) else status, len(data), digest[:16], tail))
+        if known and row["outcome"] == "not compared":
+            raise c.StopTest("the known-answer file %s could not be read: status 0x%08x (%s); nothing more is read"
+                             % (path, status, row["status_name"]))
         if known and row["outcome"] != "match":
             raise c.StopTest("the known-answer file %s does not match the 2.03 update; nothing more is read" % path)
     required = [r for r in rows if r["required"]]
@@ -271,12 +275,23 @@ def selftest():
           set(names) <= {"READ_HASP", "SET_FILE_PATH", "GET_FILE2"} and names.count("GET_FILE2") == len(FILES))
     vendor = [e["name"] for e in session.events if e["kind"] == "usb_vendor_out"]
     check("stop request sent at the end", vendor[-1:] == ["STOP_SENSER"])
-    # 2. known answer differs -> stop after the first file
+    # 2a. known answer differs -> stop after the first file
     bad = dict(files)
     bad[wire(FILES[0][0])] = b"<not the 2.03 file/>"
     session, _m, _s = sim_run(bad, expected)
     check("known-answer mismatch stops after the first read",
           len(session.results.get("files", [])) == 1 and "known-answer" in session.results.get("stopped", ""))
+    vendor = [e["name"] for e in session.events if e["kind"] == "usb_vendor_out"]
+    check("  ... and still sends the stop request", vendor[-1:] == ["STOP_SENSER"])
+    # 2b. known answer cannot be read -> report the camera status, not a firmware mismatch
+    session, _m, _s = sim_run(files, expected, {wire(FILES[0][0]): 0x10000004})
+    rows = session.results.get("files", [])
+    stopped = session.results.get("stopped", "")
+    check("known-answer mount failure is named",
+          len(rows) == 1 and rows[0]["status_name"] == "service partition did not mount"
+          and rows[0]["outcome"] == "not compared", stopped)
+    check("known-answer read failure is not called a mismatch",
+          "could not be read" in stopped and "0x10000004" in stopped and "does not match" not in stopped, stopped)
     vendor = [e["name"] for e in session.events if e["kind"] == "usb_vendor_out"]
     check("  ... and still sends the stop request", vendor[-1:] == ["STOP_SENSER"])
     # 3. a required file differs -> all read, verdict NOT MATCHING

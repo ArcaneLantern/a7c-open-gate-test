@@ -23,7 +23,7 @@ One USB session with the camera in Mass Storage mode:
 
    | File | Why |
    |---|---|
-   | `/usr/share/pmbp/DeviceInfo.xml` | known answer: if it differs, nothing more is read |
+   | `/usr/share/pmbp/DeviceInfo.xml` | known answer: if it differs or cannot be read, nothing more is read |
    | `/usr/lib/libJiritsu.so`, `/usr/lib/libsencore.so` | the service-mode libraries |
    | `/usr/codec/vcd_firmware.bin` | the video codec's firmware |
    | `/system/av-cam.bin` (17 MB) | the imaging and recording program |
